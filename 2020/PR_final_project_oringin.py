@@ -19,10 +19,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from functools import partial
 from tqdm import tqdm
-from pathlib import Path
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "test_images"
-OUTPUT_DIR.mkdir(exist_ok=True)
 
 def ran_pert_dist(minimum: float, most_likely: float, maximum: float, confidence: float, samples: int) -> float:
     """Produce random numbers according to the 'Modified PERT' distribution.
@@ -83,12 +80,9 @@ class Variables:
         ...     print("Fail")
         Pass
         """
-        # Computes the Infectious Rate (Beta) for the Delta variant (B.1.617.2).
-        r0_delta = np.random.uniform(5.0, 8.0)
-        infec_sample = ran_pert_dist(8, 10, 14, confidence=4, samples=1000)
-        outcome_rate = 1.0 / infec_sample
-        infectious_rate = r0_delta * outcome_rate
-        return np.random.choice(infectious_rate)
+        # infectious rate - https://www.inverse.com/mind-body/how-long-are-you-infectious-when-you-have-coronavirus
+        infectious_rate = np.random.choice(1.0 / (ran_pert_dist(8, 10, 14, confidence=4, samples=1000)))  # beta
+        return infectious_rate
 
     @staticmethod
     def e_i():  # e= Exposed;    i = Infected
@@ -160,7 +154,6 @@ def admitted_bed(number_of_days: int, new_days: list, lst_outcome: list, lst_day
         for j in range(new_days[i] + 1):
             if j == new_days[i]:
                 number_of_beds = number_of_beds - lst_hospitalized[i]
-                # number_of_beds = max(number_of_beds, 0.0)
                 admitted_beds.append(number_of_beds)
     beds_available, num_x_days = available_bed(number_of_days, lst_outcome, lst_day_out, number_of_beds, admitted_beds)
     return beds_available, num_x_days
@@ -222,7 +215,7 @@ def test_result_days(lst_day: list, lst_time_to_outcome: list, number_of_days: i
     return avail_beds, num_days
 
 
-def model(simulation_id: int, number_of_days: int, population: int, total_beds: int, contact_rate: float = 0.05, hospitalization_rate: float = 0.17) -> tuple:
+def model(simulation_id: int, number_of_days: int, population: int, total_beds: int) -> tuple:
     """
         Computes the number of people in each compartment based on the transitional variables defined in the class Variables
         :param simulation_id: ID for a simulation for a given pool of processes
@@ -238,9 +231,8 @@ def model(simulation_id: int, number_of_days: int, population: int, total_beds: 
     number_of_beds = total_beds
     total_population = population
     exposed = 1.0
-    susceptible = total_population - 1.0
-    infected = 1.0
-    recovered = 0.0
+    susceptible = total_population
+    infected = 0.0
     day = 0
 
 
@@ -252,23 +244,14 @@ def model(simulation_id: int, number_of_days: int, population: int, total_beds: 
     lst_hospitalized = []
 
     for i in range(number_of_days):
-        beta = Variables.s_e()
-        incubation_rate, arrival_rate, prob_positive, test_result_time = Variables.e_i()
-
-        new_exposed = beta * susceptible * infected / total_population
-        new_infected = incubation_rate * exposed
-        _, rate_outcome = Variables.i_r()
-        new_recovered = rate_outcome * infected
-
-        susceptible = max(susceptible - new_exposed, 0.0)
-        exposed = max(exposed + new_exposed - new_infected, 0.0)
-        infected = max(infected + new_infected - new_recovered, 0.0)
-        recovered = recovered + new_recovered
+        susceptible = susceptible - int(Variables.s_e())*infected*susceptible
+        incub_rate, arr_rate, prob_pos, test_result_time = Variables.e_i()
+        exposed = (Variables.s_e() * susceptible - incub_rate * exposed)*0.05  # People getting exposed after social distancing - https://github.com/covid19-bh-biostats/seir/blob/master/SEIR/model_configs/basic
         day = day + test_result_time
-
-        hospitalized = min(infected * hospitalization_rate, total_population)  # People who require hospitalization - https://gis.cdc.gov/grasp/covidnet/COVID19_3.html ; https://en.as.com/en/2020/04/12/other_sports/1586725810_541498.html
+        infected = arr_rate * prob_pos * exposed
+        hospitalized = int(infected*(17/100))  # People who require hospitalization - https://gis.cdc.gov/grasp/covidnet/COVID19_3.html ; https://en.as.com/en/2020/04/12/other_sports/1586725810_541498.html
         lst_hospitalized.append(hospitalized)
-        outcome_time, _ = Variables.i_r()
+        outcome_time, rate_outcome = Variables.i_r()
         outcome = rate_outcome * hospitalized
         lst_outcome.append(outcome)
         lst_day.append(test_result_time)
@@ -320,12 +303,11 @@ def simulation(number_of_days: int, number_of_simulation: int, population: int, 
     # This patch gives the percentage of vacant beds for the nth simulation day
 
     for beds, days in list_of_beds_and_days:
-        overflowed = any(bed < 0 for bed in beds)
-        if overflowed:
-            prob_vacant = 0.0
+        if beds[-1] < 0:
+            prob_vacant = 0
         else:
-            prob_vacant = (beds[-1] / total_beds) * 100
-        perc_vacant_beds.append(prob_vacant)
+            prob_vacant = (beds[-1] * 1.0 / total_beds)
+        perc_vacant_beds.append(prob_vacant*100)
 # Hypothesis-1 : If the number of hospital beds is doubled, there will never be an overflow in the available number of beds.
 # This patch gives the day on which the number of beds hits zero and appends that day number in overflow_day list
 # which is later plotted accordingly.
@@ -384,7 +366,7 @@ if __name__ == '__main__':
     plt.ylabel('Frequency')
     plt.xlabel('% vacant beds')
     plt.title("Percent Vacant Beds")
-    plt.savefig(OUTPUT_DIR / 'percent_vacant_beds-hist.png')
+    plt.savefig('percent_vacant_beds-hist.png')
     plt.clf()
 
     # Plot for Hypothesis - 1
@@ -392,8 +374,7 @@ if __name__ == '__main__':
     plt.ylabel('Frequency')
     plt.xlabel('Number of Days until Overflow')
     plt.title("nth Day When Beds Overflows")
-    plt.savefig(OUTPUT_DIR / 'overflow-days-hist.png')
-    plt.clf()
+    plt.savefig('overflow-days-hist.png')
 
     # Plot for simulation
     for beds, days in list_of_beds_and_days:
@@ -401,5 +382,5 @@ if __name__ == '__main__':
     plt.ylabel('Available Beds')
     plt.xlabel('Number of Days')
     plt.title("Available Number of Beds")
-    plt.savefig(OUTPUT_DIR / 'beds-vs-days.png')
+    plt.savefig('beds-vs-days.png')
     plt.clf()
