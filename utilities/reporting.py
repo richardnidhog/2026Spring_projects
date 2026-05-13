@@ -7,6 +7,7 @@ from .paths import PROJECT_ROOT
 
 
 def _fmt_overflow(ov: dict) -> tuple:
+    """Formats overflow stats as display strings for a markdown table row."""
     prob = f"{ov['prob_overflow']:.1%}"
     if ov.get("n_overflowed", 0) > 0:
         mean_day = f"{ov['mean']:.1f}"
@@ -18,6 +19,7 @@ def _fmt_overflow(ov: dict) -> tuple:
 
 
 def _fmt_vacancy(vs: dict) -> tuple:
+    """Formats vacancy stats as display strings for a markdown table row."""
     mean_v = f"{vs['mean']:.2f}%"
     lo, hi = vs["ci95"]
     if math.isnan(lo) or math.isnan(hi) or lo == hi:
@@ -28,6 +30,7 @@ def _fmt_vacancy(vs: dict) -> tuple:
 
 
 def _h1_section(h1: dict, total_beds: int) -> list:
+    """Returns markdown lines for the H1 results table."""
     lines = ["## H1: Bed Doubling under COVID-only Surge (Delta variant)\n",
              "Compares baseline beds vs doubled beds, no lockdown.\n",
              "| Scenario | Beds | Overflow Probability | Mean Overflow Day | 95 % CI | Mean Vacancy % | 95 % CI |",
@@ -43,6 +46,7 @@ def _h1_section(h1: dict, total_beds: int) -> list:
 
 
 def _h2_section(h2: dict, total_beds: int) -> list:
+    """Returns markdown lines for the H2 results table."""
     lines = ["## H2: Bed Doubling under COVID + Influenza (Delta variant, doubled beds)\n",
              f"Both scenarios at {total_beds * 2:,} beds, no lockdown.\n",
              "| Scenario | Overflow Probability | Mean Overflow Day | 95 % CI | Mean Vacancy % | 95 % CI |",
@@ -58,7 +62,7 @@ def _h2_section(h2: dict, total_beds: int) -> list:
 
 
 def _h3_lockdown_table(rows: list) -> list:
-    """Build a 3-row markdown table (one row per lockdown level)."""
+    """Returns markdown lines for a single H3 lockdown table."""
     lines = [
         "| Lockdown | Overflow Probability | Mean Overflow Day | 95 % CI | Mean Vacancy % | 95 % CI |",
         "|---:|---:|---:|---:|---:|---:|",
@@ -73,6 +77,8 @@ def _h3_lockdown_table(rows: list) -> list:
 
 
 def _h3_section(h3: dict) -> list:
+    """Returns all markdown lines for the H3 results section.
+    """
     lines = ["## H3: Lockdown Impact (3 categories × 3 lockdown levels)\n"]
 
     lines.append("### Influenza-only baseline (no COVID)\n")
@@ -94,7 +100,7 @@ def _h3_section(h3: dict) -> list:
     if diag:
         lines.append("### Per-scenario diagnostics\n")
 
-        # Omicron
+        # Omicron worst-case
         s = diag.get("omicron_only")
         if s is not None and "overflow" in s:
             prob, mean_d, ci_d = _fmt_overflow(s["overflow"])
@@ -106,7 +112,7 @@ def _h3_section(h3: dict) -> list:
             lines.append(f"- Mean vacancy: {mean_v}  (95 % CI {ci_v})")
             lines.append("")
 
-        # Flu
+        # flu infection dynamics table
         flu = diag.get("flu_only")
         if isinstance(flu, dict) and flu:
             lines.append("**Flu-only — infection dynamics across lockdown levels**")
@@ -128,6 +134,7 @@ def _h3_section(h3: dict) -> list:
 
 
 def _outputs_section(all_results: dict) -> list:
+    """Returns markdown lines listing which output files were generated."""
     lines = ["## Output files\n",
              "All plot files are in `test_images/`.  Generated this run:\n"]
     if "h1" in all_results:
@@ -152,7 +159,6 @@ def write_markdown_summary(
     runtime_s: float,
     output_path=None,
 ) -> Path:
-
     out = Path(output_path) if output_path is not None else PROJECT_ROOT / "simulation_summary.md"
 
     lines: list = []

@@ -16,9 +16,22 @@ def save_diagnostic_plots(
     summary: dict,
     total_beds: int = None,
 ) -> None:
+    """Saves three diagnostic plots for a scenario to test_images/.
+
+    The three plots are: beds vs days, overflow day histogram, and percent vacant beds histogram.
+
+    :param label: used in titles and output filenames
+    :param overflow_days: first-overflow days from each run that overflowed
+    :param beds_and_days: list of (beds, days) tuples from each simulation run
+    :param perc_vacant: vacancy percentages at simulation end
+    :param summary: stats dict returned by report_stats()
+    :param total_beds: used to set the y-axis upper limit (optional)
+    """
     safe = label.replace(" ", "_")
     n = len(beds_and_days)
+    # make individual lines more transparent when there are more runs
     alpha = float(np.clip(50.0 / n, 0.04, 0.5))
+
     fig, ax = plt.subplots(figsize=(8, 5))
     for beds, days in beds_and_days:
         ax.plot(days, beds, alpha=alpha, linewidth=0.5, color="steelblue")
@@ -75,6 +88,7 @@ def save_diagnostic_plots(
 
 
 def plot_flu_infections(trajectories: list, label: str, n_days: int) -> None:
+    """Plots active flu infections over time with mean and 5-95 percentile band."""
     fig, ax = plt.subplots(figsize=(9, 5))
     days = np.arange(n_days)
 
@@ -113,6 +127,7 @@ def plot_flu_infection_proportion(
     n_days: int,
     population: int,
 ) -> None:
+    """Plots flu infections as a fraction of the total population over time."""
     fig, ax = plt.subplots(figsize=(9, 5))
     days = np.arange(n_days)
 
@@ -151,6 +166,10 @@ def plot_flu_lockdown_comparison(
     n_days: int,
     population: int,
 ) -> None:
+    """3-panel plot comparing flu infection dynamics across lockdown levels.
+
+    Shows active infections, infection proportion, and cumulative attack rate side by side for each lockdown level.
+    """
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
     days = np.arange(n_days)
     colors = {0.0: "crimson", 0.25: "darkorange", 0.5: "forestgreen"}
@@ -174,6 +193,7 @@ def plot_flu_lockdown_comparison(
                          np.percentile(prop_arr, 95, axis=0),
                          color=color, alpha=0.15)
 
+        # cumulative attack rate = fraction of population no longer susceptible
         S_arr = np.array([t["S"] for t in trajs])
         attack_arr = (1.0 - S_arr / population) * 100.0
         ax3.plot(days, attack_arr.mean(axis=0), color=color, linewidth=2, label=legend)
@@ -206,6 +226,10 @@ def plot_flu_lockdown_comparison(
 
 
 def plot_lockdown_experiments(results: dict, total_beds: int) -> None:
+    """Saves H3 bar charts showing overflow probability and bed vacancy by lockdown level.
+
+    Produces three figures: flu-only baseline, COVID-only by variant, and COVID + influenza by variant.
+    """
     flu_only   = results["flu_only"]
     covid_only = results["covid_only"]
     dual       = results["dual"]
@@ -215,6 +239,7 @@ def plot_lockdown_experiments(results: dict, total_beds: int) -> None:
     x_labels = [f"{int(L * 100)}%" for L in levels]
 
     def _bars(ax, data, color, ylabel, title, ylim=None, fmt="{:.2f}"):
+        """Helper to draw a simple bar chart with value labels."""
         bars = ax.bar(x_pos, data, color=color, alpha=0.75,
                       edgecolor="black", linewidth=0.5)
         ax.set_xticks(x_pos)
@@ -229,6 +254,7 @@ def plot_lockdown_experiments(results: dict, total_beds: int) -> None:
                     fmt.format(v), ha="center", va="bottom", fontsize=8)
 
     def _bars_err(ax, mean, lo, hi, color, ylabel, title, ylim=None):
+        """Helper to draw a bar chart with 95% CI error bars."""
         err_lo = [max(m - l, 0) for m, l in zip(mean, lo)]
         err_hi = [max(h - m, 0) for m, h in zip(mean, hi)]
         ax.bar(x_pos, mean, yerr=[err_lo, err_hi], color=color, alpha=0.75,
@@ -243,6 +269,7 @@ def plot_lockdown_experiments(results: dict, total_beds: int) -> None:
         for i, m in enumerate(mean):
             ax.text(i, m, f"{m:.1f}", ha="center", va="bottom", fontsize=8)
 
+    # flu-only baseline figure
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
     _bars(ax1,
           [r["overflow"]["prob_overflow"] for r in flu_only],
@@ -262,6 +289,7 @@ def plot_lockdown_experiments(results: dict, total_beds: int) -> None:
     plt.close(fig)
     print(f"  Saved -> {out.name}")
 
+    # COVID-only and dual figures, one column per variant
     variant_colors = {"original": "steelblue", "delta": "crimson",
                       "omicron":  "darkorange"}
     for category_key, category_data in [

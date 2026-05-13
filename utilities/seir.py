@@ -17,6 +17,17 @@ def _seir_stream(
     hosp_rate: float,
     initial_infected: int = 1,
 ) -> tuple:
+    """Runs one SEIR simulation for a single pathogen and returns daily hospitalization data.
+
+    Updates S, E, I, R compartments each day. Returns four lists for use in bed tracking.
+
+    :param n_days: number of days to simulate
+    :param population: total population size
+    :param variables: variant class (e.g. DeltaVariables, FluVariables)
+    :param compliance: lockdown compliance level from 0.0 (none) to 1.0 (full)
+    :param hosp_rate: fraction of infected people who need a hospital bed
+    :param initial_infected: starting infected count (default 1)
+    """
     susceptible = float(population) - float(initial_infected)
     exposed     = 0.0
     infected    = float(initial_infected)
@@ -28,6 +39,7 @@ def _seir_stream(
     lst_tto:          list = []
 
     for _ in range(n_days):
+        # draw stochastic transition rates for this day
         beta = variables.s_e() * (1.0 - compliance)
         incub_rate, _, _, test_result_time = variables.e_i()
         _, rate_outcome = variables.i_r()
@@ -36,6 +48,7 @@ def _seir_stream(
         new_infected  = min(incub_rate * exposed, exposed)
         new_recovered = min(rate_outcome * infected, infected)
 
+        # move people between compartments
         susceptible -= new_exposed
         exposed     += new_exposed  - new_infected
         infected    += new_infected - new_recovered
@@ -66,6 +79,8 @@ def model(
     variables=None,
     hosp_rate: float = 0.17,
 ) -> tuple:
+    """Runs a single COVID-only simulation and returns bed availability over time.
+    """
     if variables is None:
         variables = DeltaVariables
 
@@ -83,19 +98,29 @@ def dual_model(
     hosp_rate_flu: float   = 0.015,
     covid_variables=None,
 ) -> tuple:
+    """Runs a single simulation with COVID and/or influenza co-circulating.
+
+    :param hosp_rate_covid: set to 0.0 to disable COVID entirely
+    :param hosp_rate_flu: set to 0.0 to disable influenza entirely
+    """
     if covid_variables is None:
         covid_variables = DeltaVariables
 
+    # only COVID is active — skip flu stream entirely
     if hosp_rate_flu == 0.0 and hosp_rate_covid > 0.0:
         h, o, d, t = _seir_stream(n_days, population, covid_variables, compliance, hosp_rate_covid)
         return test_result_days(d, t, n_days, o, h, total_beds)
+
+    # only flu is active — skip COVID stream
     if hosp_rate_covid == 0.0 and hosp_rate_flu > 0.0:
         h, o, d, t = _seir_stream(n_days, population, FluVariables, compliance, hosp_rate_flu,
                                    initial_infected=FLU_INITIAL_INFECTED)
         return test_result_days(d, t, n_days, o, h, total_beds)
+
     if hosp_rate_covid == 0.0 and hosp_rate_flu == 0.0:
         return [total_beds] * n_days, list(range(n_days))
 
+    # both active — run two independent SEIR streams and combine
     c_h, c_o, c_d, c_t = _seir_stream(n_days, population, covid_variables, compliance, hosp_rate_covid)
     f_h, f_o, f_d, f_t = _seir_stream(n_days, population, FluVariables,    compliance, hosp_rate_flu,
                                        initial_infected=FLU_INITIAL_INFECTED)
@@ -111,6 +136,18 @@ def dual_model(
 
 
 def _summarize_runs(beds_and_days: list, total_beds: int) -> tuple:
+    """Extracts overflow days and vacancy percentages from all simulation runs.
+
+    For each run, finds the first day beds hit zero and the percentage of
+    beds still available at the end. Runs with overflow get vacancy = 0.
+
+    >>> results = [([100, 50, -5], [0, 1, 2])]
+    >>> overflow, vacancy = _summarize_runs(results, 200)
+    >>> overflow
+    [2]
+    >>> vacancy
+    [0.0]
+    """
     overflow_days:    list = []
     perc_vacant_beds: list = []
     for beds, _ in beds_and_days:
@@ -124,6 +161,11 @@ def _summarize_runs(beds_and_days: list, total_beds: int) -> tuple:
 
 
 def _run_pool(worker, n_simulations: int, do_threading: bool, desc: str = "") -> list:
+    """Runs n_simulations calls to worker, with or without multiprocessing.
+
+    :param worker: a partial function that accepts a simulation_id int
+    :param do_threading: if True, uses a Pool of 4 worker processes
+    """
     results: list = []
     if do_threading:
         with Pool(processes=4) as pool:
@@ -148,6 +190,10 @@ def simulation(
     hosp_rate: float = 0.17,
     do_threading: bool = True,
 ) -> tuple:
+    """Runs multiple COVID-only simulations and returns aggregated results.
+
+    Returns overflow days, all beds/days raw data, and vacancy percentages across all runs.
+    """
     worker = partial(
         model, n_days=n_days, population=population, total_beds=total_beds,
         compliance=compliance, variables=variables, hosp_rate=hosp_rate,
@@ -171,6 +217,10 @@ def dual_simulation(
     covid_variables=None,
     do_threading: bool = True,
 ) -> tuple:
+    """Same as simulation() but supports co-circulating pathogens.
+
+    Set hosp_rate_flu=0.0 for COVID-only or hosp_rate_covid=0.0 for flu-only.
+    """
     worker = partial(
         dual_model, n_days=n_days, population=population, total_beds=total_beds,
         compliance=compliance, hosp_rate_covid=hosp_rate_covid,
@@ -192,6 +242,10 @@ def seir_trajectory(
     compliance: float = 0.0,
     initial_infected: int = 1,
 ) -> dict:
+    """Runs the SEIR model and returns the full S, E, I, R time series.
+
+    Returns a dict with keys 'S', 'E', 'I', 'R', 'new_infections'.
+    """
     if variables is None:
         variables = FluVariables
 
@@ -220,6 +274,7 @@ def seir_trajectory(
         infected    += new_infected - new_recovered
         recovered   += new_recovered
 
+        # record compartment sizes for this day
         S.append(susceptible)
         E.append(exposed)
         I.append(infected)
@@ -237,6 +292,7 @@ def flu_seir_simulation(
     do_threading: bool = True,
     initial_infected: int = None,
 ) -> list:
+    """Runs multiple SEIR simulations for influenza-only dynamics."""
     if initial_infected is None:
         initial_infected = FLU_INITIAL_INFECTED
 
@@ -263,6 +319,7 @@ def compliance_sweep(
     covid_variables=None,
     do_threading: bool = True,
 ) -> list:
+    """Runs a sweep over lockdown compliance levels for COVID and/or flu."""
     from .stats import report_stats   # local import: avoid circular dep on plotting
 
     results: list = []

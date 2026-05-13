@@ -9,6 +9,15 @@ def admitted_bed(
     lst_hospitalized: list,
     number_of_beds: int,
 ) -> tuple:
+    """Reduces available beds as patients are admitted on their test-result day.
+
+    Simulate day by day, and when a patient's test results are available, 
+    subtract the number of hospitalized patients from the total number of beds. 
+    Then call the `available_bed` function to recalculate the number of available beds.
+
+    >>> admitted_bed(2, [5, 10], [40, 28], [23, 33], [10, 5], 500)
+    ([530, 513], [0, 1])
+    """
     admitted_beds: list = []
     for i in range(number_of_days):
         for j in range(new_days[i] + 1):
@@ -25,6 +34,10 @@ def available_bed(
     number_of_beds: int,
     admitted_beds: list,
 ) -> tuple:
+    """Adds beds back as patients are discharged.
+
+    Returns a list of available beds per day and the corresponding day indices.
+    """
     x_num_days:     list = []
     available_beds: list = []
     for i in range(number_of_days):
@@ -45,6 +58,13 @@ def test_result_days(
     lst_hospitalized: list,
     number_of_beds: int,
 ) -> tuple:
+    """Converts per-day test delays into absolute day indices, then runs bed tracking.
+
+    Adds the test result delay to each day index so patients are admitted on the right absolute day.
+
+    >>> test_result_days([2, 3], [6, 7], 2, [40, 28], [10, 5], 500)
+    ([530, 513], [0, 1])
+    """
     new_days:    list = []
     lst_day_out: list = []
     for k in range(len(lst_day)):

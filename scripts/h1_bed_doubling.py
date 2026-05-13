@@ -17,7 +17,17 @@ def run(
     n_days: int,
     do_threading: bool = True,
 ) -> dict:
-    """Run H1 before/after with the given parameters and save diagnostic plots."""
+    """Tests whether doubling beds eliminates overflow under a Delta COVID-only surge.
+
+    Runs two scenarios. Saves three diagnostic plots for each scenario
+    and returns summary statistics for both.
+
+    :param population: total population size
+    :param total_beds: baseline bed count (doubled version is computed internally)
+    :param n_simulations: number of Monte Carlo runs per scenario
+    :param n_days: simulation length in days
+    :return: dict with 'before' and 'after' summary stat dicts
+    """
     print("\n" + "=" * 60)
     print(f"  H1 Before  pop={population:,}  beds={total_beds:,}  sims={n_simulations}")
     print("=" * 60)

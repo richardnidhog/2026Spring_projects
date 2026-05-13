@@ -17,7 +17,12 @@ def run(
     n_days: int,
     do_threading: bool = True,
 ) -> dict:
-    """Run H2-A (COVID-only) and H2-B (dual) at 2x bed count, no lockdown."""
+    """Compares COVID-only vs COVID+flu at doubled bed capacity (no lockdown).
+
+    Runs two scenarios both at 2x beds. Saves diagnostic plots for each and returns both summaries.
+
+    :return: dict with 'covid_only' and 'dual' summary stat dicts
+    """
     doubled_beds = total_beds * 2
 
     print("\n" + "=" * 60)

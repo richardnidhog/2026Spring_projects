@@ -6,6 +6,15 @@ from scipy import stats as sp_stats
 
 
 def _ci95(arr) -> tuple:
+    """Computes a 95% confidence interval using the t-distribution.
+
+    Returns (lower, upper). Returns (nan, nan) for empty input,
+    or (mean, mean) if all values are the same (zero standard error).
+
+    >>> lo, hi = _ci95([5.0, 5.0, 5.0])
+    >>> lo == hi == 5.0
+    True
+    """
     n = len(arr)
     if n == 0:
         return float("nan"), float("nan")
@@ -26,6 +35,16 @@ def report_stats(
     perc_vacant_beds: list,
     n_simulations: int,
 ) -> dict:
+    """Summarizes overflow and bed vacancy statistics across all simulation runs.
+
+    Computes overflow probability, mean first-overflow day with 95% CI,
+    and mean bed vacancy at simulation end. Also prints a formatted summary.
+
+    :param overflow_days: list of first-overflow days for runs that overflowed
+    :param perc_vacant_beds: vacancy percentage at simulation end for each run
+    :param n_simulations: total number of runs (used to compute probability)
+    :return: dict with 'overflow' and 'vacancy' sub-dicts
+    """
     if overflow_days:
         od = np.array(overflow_days, dtype=float)
         lo, hi = _ci95(od)

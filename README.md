@@ -42,15 +42,7 @@ Exposed (E) was re-drawn as an independent random variable mid-loop, meaning S +
 
 ### 3.1 SEIR Dynamics
 
-The corrected SEIR model is implemented in `utilities/seir.py`. The susceptible population is updated according to the standard formula:
-
-```python
-new_exposed = int(β * infected * susceptible / population)
-susceptible -= new_exposed
-exposed += new_exposed - int(σ * exposed)
-infected += int(σ * exposed) - int(γ * infected)
-recovered += int(γ * infected)
-```
+The corrected SEIR model is implemented in `utilities/seir.py`.
 
 ### 3.2 Variant Classes
 
@@ -144,22 +136,22 @@ Influenza alone does not overflow the bed system at any lockdown level. Lockdown
 
 ```
 .
-├── main.py                        # CLI entry point
+├── main.py                        
 ├── scripts/
-│   ├── h1_bed_doubling.py         # H1 experiment driver
-│   ├── h2_dual_pathogen.py        # H2 experiment driver
-│   └── h3_lockdown_experiment.py  # H3 experiment driver
+│   ├── h1_bed_doubling.py         
+│   ├── h2_dual_pathogen.py        
+│   └── h3_lockdown_experiment.py 
 ├── utilities/
-│   ├── seir.py                    # Corrected SEIR engine
-│   ├── variants.py                # Variant and flu parameter classes
-│   ├── bed_tracking.py            # Admission / discharge accounting
-│   ├── distributions.py           # PERT distribution
-│   ├── plotting.py                # All figure generation
-│   ├── stats.py                   # 95% CI and summary statistics
-│   └── reporting.py               # Markdown summary writer
-├── 2020/                          # Original code, preserved unchanged
-├── test_images/                   # Output plots (generated on run)
-└── simulation_summary.md          # Numeric results (generated on run)
+│   ├── seir.py                    
+│   ├── variants.py                
+│   ├── bed_tracking.py            
+│   ├── distributions.py           
+│   ├── plotting.py                
+│   ├── stats.py                   
+│   └── reporting.py               
+├── 2020/                          
+├── test_images/                   
+└── simulation_summary.md          
 ```
 
 ### 5.2 Running the Full Simulation
@@ -168,7 +160,7 @@ Influenza alone does not overflow the bed system at any lockdown level. Lockdown
 python main.py
 ```
 
-This runs all three hypotheses with the defaults: 2,710,000 population, 33,000 beds, 200 simulations, 60 days, multiprocessing enabled.
+This runs all three hypotheses with the defaults: 2,710,000 population, 33,000 beds, 200 simulations, 60 days.
 
 To increase statistical precision (1,000 simulations matches the published results above):
 

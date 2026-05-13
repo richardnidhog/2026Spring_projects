@@ -24,12 +24,19 @@ def run_lockdown_experiments(
     do_threading: bool = True,
     lockdown_levels: list = None,
 ) -> dict:
+    """Runs a compliance sweep for flu-only, each COVID variant, and each dual combo.
+
+    For each of the three categories, runs simulations at every lockdown level specified in lockdown_levels.
+
+    :return: dict with keys 'flu_only', 'covid_only', 'dual'
+    """
     levels = lockdown_levels if lockdown_levels is not None else LOCKDOWN_LEVELS
 
     print("\n" + "=" * 60)
     print("  Experiment 1 of 3 -- Influenza-only baseline (no COVID)")
     print(f"  Lockdown levels: {[f'{int(L * 100)}%' for L in levels]}")
     print("=" * 60)
+    # run flu-only with COVID hospitalization rate set to zero
     flu_only = compliance_sweep(
         levels, n_days, n_simulations, population, total_beds,
         hosp_rate_covid=0.0, hosp_rate_flu=0.015,
@@ -61,8 +68,14 @@ def run_lockdown_experiments(
 
 
 def _flu_summary(trajectories_by_lockdown: dict, population: int) -> dict:
+    """Computes attack rate and peak infection stats for each lockdown level.
+
+    Goes through flu-only SEIR trajectories and summarizes key epidemiological
+    metrics: cumulative attack rate, peak infections, and mean peak day.
+    """
     summary: dict = {}
     for lockdown, trajs in trajectories_by_lockdown.items():
+        # final R compartment = total who were ever infected
         final_R  = np.array([t["R"][-1] for t in trajs])
         peak_I   = np.array([max(t["I"]) for t in trajs])
         peak_day = np.array([t["I"].index(max(t["I"])) for t in trajs])
@@ -86,6 +99,11 @@ def _diagnostic_plots_omicron_and_flu(
     total_beds: int,
     do_threading: bool = True,
 ) -> dict:
+    """Generates diagnostic plots for the Omicron worst-case and flu dynamics.
+
+    Runs Omicron-only at 0% lockdown and flu-only at all three lockdown levels.
+    Saves several plots and returns summary stats for the markdown report.
+    """
     print("\n" + "=" * 60)
     print("  Per-scenario diagnostic plots")
     print("=" * 60)
@@ -107,6 +125,7 @@ def _diagnostic_plots_omicron_and_flu(
             compliance=lockdown, do_threading=do_threading,
         )
 
+    # save three flu trajectory plots
     plot_flu_infections(flu_trajectories[0.0], "H3_flu_only", n_days)
     plot_flu_infection_proportion(flu_trajectories[0.0], "H3_flu_only", n_days, population)
     plot_flu_lockdown_comparison(flu_trajectories, "H3_flu_only", n_days, population)
@@ -123,6 +142,13 @@ def run(
     n_days: int,
     do_threading: bool = True,
 ) -> dict:
+    """Runs all H3 experiments and saves the lockdown summary figures.
+
+    First runs the full compliance sweep across variants and pathogen combos,
+    then generates per-scenario diagnostics for Omicron and flu.
+
+    :return: combined results dict (includes 'diagnostics' key)
+    """
     results = run_lockdown_experiments(
         n_days, n_simulations, population, total_beds, do_threading=do_threading,
     )
